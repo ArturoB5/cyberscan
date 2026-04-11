@@ -1,20 +1,19 @@
-from fastapi import FastAPI, UploadFile, File
-from backend.routes.scan import router as scan_router
-import hashlib
+from fastapi import FastAPI
 
-app = FastAPI()
+from backend.routes.scan import router as scan_router
+
+app = FastAPI(
+    title="CyberScan API",
+    version="1.1.0",
+    description="API para analizar archivos, URLs, hashes, dominios e IPs con VirusTotal.",
+)
 app.include_router(scan_router)
+
 
 @app.get("/")
 def root():
-    return {"message": "CyberScan API running"}
-
-async def scan_file(file: UploadFile = File(...)):
-    content = await file.read()
-    
-    sha256_hash = hashlib.sha256(content).hexdigest()
-
     return {
-        "filename": file.filename,
-        "sha256": sha256_hash
+        "message": "CyberScan API running",
+        "docs": "/docs",
+        "health": "ok",
     }

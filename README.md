@@ -1,191 +1,134 @@
-# 🛡️ CyberScan Dashboard
+# CyberScan Dashboard
 
-> 🚀 Plataforma inteligente de análisis de amenazas para archivos y URLs
-> ⚡ Powered by Avalon Labs
-> 👤 Author: Arturo Badillo
+CyberScan es una plataforma ligera para consultar indicadores de amenaza en VirusTotal desde una API con FastAPI y una interfaz en Streamlit.
 
----
+Actualmente permite analizar:
 
-## 🌐 Overview
+- Archivos
+- URLs publicas
+- Hashes MD5, SHA1 y SHA256
+- Dominios
+- Direcciones IP publicas
 
-**CyberScan** es una aplicación web que permite analizar archivos y URLs en busca de posibles amenazas utilizando la API de **VirusTotal**.
+## Que hace hoy
 
-El sistema está diseñado con una arquitectura moderna:
+- Clasifica el riesgo en `SAFE`, `LOW RISK`, `MEDIUM RISK` o `HIGH RISK`
+- Muestra conteos de motores (`malicious`, `suspicious`, `undetected`, etc.)
+- Reutiliza reportes existentes cuando VirusTotal ya conoce el indicador
+- Envia archivos y URLs a analisis cuando todavia no existe un reporte
+- Bloquea entradas obvias no seguras para el flujo, como `localhost` o IPs no publicas
 
-- 🔙 Backend: API con FastAPI
-- 🎨 Frontend: Dashboard interactivo con Streamlit
-- 🧠 Análisis: Clasificación automática de riesgo basada en múltiples motores antivirus
+## Arquitectura
 
----
+- `backend/`: API en FastAPI
+- `frontend/`: dashboard en Streamlit
+- `backend/services/virustotal.py`: integracion con VirusTotal
+- `backend/services/analyzer.py`: normalizacion basica del riesgo
 
-## ✨ Features
+## Requisitos
 
-✔️ Escaneo de archivos en tiempo real
-✔️ Análisis de URLs sospechosas
-✔️ Clasificación de riesgo (LOW / MEDIUM / HIGH)
-✔️ Visualización amigable para usuarios no técnicos
-✔️ Dashboard moderno estilo SaaS
-✔️ Modo claro / oscuro
-✔️ Detalles técnicos expandibles
-✔️ Integración con VirusTotal API
+- Python 3.10 o superior
+- Una API key de VirusTotal
 
----
-
-## 🧠 ¿Cómo funciona?
-
-1. El usuario sube un archivo o ingresa una URL
-2. Se envía a la API backend
-3. Se consulta o sube a VirusTotal
-4. Se obtiene el resultado del análisis
-5. Se clasifica el riesgo automáticamente
-6. Se presenta en un dashboard visual
-
----
-
-## 🖼️ Preview
-
-_(Aquí puedes agregar screenshots del dashboard más adelante)_
-
----
-
-## 🛠️ Tech Stack
-
-- 🐍 Python
-- ⚡ FastAPI
-- 🎨 Streamlit
-- 🔍 VirusTotal API
-- 📦 Requests
-
----
-
-## ⚙️ Instalación
-
-### 1. Clonar repositorio
+## Instalacion
 
 ```bash
-git clone https://github.com/tu-usuario/cyberscan.git
+git clone https://github.com/ArturoB5/cyberscan.git
 cd cyberscan
-```
-
----
-
-### 2. Crear entorno virtual
-
-```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux / Mac
-.venv\Scripts\activate     # Windows
 ```
 
----
-
-### 3. Instalar dependencias
+Activar el entorno virtual:
 
 ```bash
-pip install -r requirements.txt
+# Windows
+.venv\Scripts\activate
+
+# Linux / macOS
+source .venv/bin/activate
 ```
 
----
-
-### 4. Configurar API Key
-
-En:
+Instalar dependencias:
 
 ```bash
-backend/services/virustotal.py
+pip install -r requerimientos.txt
 ```
 
-Agrega tu API Key:
+## Configuracion
 
-```python
-API_KEY = "TU_API_KEY"
+Crea un archivo `.env` en la raiz del proyecto con:
+
+```env
+VT_API_KEY=tu_api_key_aqui
 ```
 
----
+No se recomienda hardcodear la clave en el codigo.
 
-## ▶️ Ejecución
+## Ejecucion
 
-### 🔹 Backend
+Backend:
 
 ```bash
 uvicorn backend.main:app --reload
 ```
 
-👉 Disponible en:
-http://127.0.0.1:8000
-
----
-
-### 🔹 Frontend
+Frontend:
 
 ```bash
 streamlit run frontend/app.py
 ```
 
-👉 Disponible en:
-http://localhost:8501
+Servicios por defecto:
 
----
+- API: `http://127.0.0.1:8000`
+- UI: `http://localhost:8501`
 
-## 📊 Ejemplo de resultado
+## Endpoints principales
+
+- `POST /scan/file`
+- `POST /scan/url`
+- `POST /scan/hash`
+- `POST /scan/domain`
+- `POST /scan/ip`
+- `GET /scan/result/{analysis_id}`
+
+## Ejemplo de respuesta
 
 ```json
 {
+  "resource_type": "hash",
+  "indicator": "44d88612fea8a8f36de82e1278abb02f",
   "status": "completed",
-  "risk": "LOW RISK",
+  "risk": "HIGH RISK",
   "stats": {
-    "malicious": 0,
-    "suspicious": 0,
-    "undetected": 62
+    "malicious": 61,
+    "suspicious": 2,
+    "undetected": 5
   }
 }
 ```
 
----
+## Seguridad y limites
 
-## 🚀 Roadmap
+- Los archivos vacios se rechazan
+- Los archivos se limitan a 32 MB para evitar abuso de memoria en este flujo
+- Solo se aceptan URLs con `http` o `https`
+- Se rechazan `localhost` e IPs no publicas en escaneo de URL e IP
+- El analisis depende de la disponibilidad y cuota de VirusTotal
 
-- [ ] 🌍 Deploy público
-- [ ] 🧾 Historial de análisis
-- [ ] 🔐 Autenticación de usuarios
-- [ ] 📊 Gráficos de resultados
-- [ ] 🤖 Explicación con IA
+## Roadmap sugerido
 
----
+- Historial local de consultas
+- Cache de respuestas por indicador
+- Autenticacion de usuarios
+- Exportacion de reportes
+- Analisis enriquecido con reputacion y recomendaciones
 
-## 🧑‍💻 Autor
+## Autor
 
-**Arturo Badillo**
-🚀 Avalon Labs
+Arturo Badillo  
+Avalon Labs
 
----
+## Disclaimer
 
-## ⚠️ Disclaimer
-
-Este proyecto es educativo y depende de la API de VirusTotal.
-No reemplaza soluciones profesionales de ciberseguridad.
-
----
-
-## ⭐ Support
-
-Si te gusta este proyecto:
-
-👉 Dale una estrella ⭐ en GitHub
-👉 Compártelo
-👉 Úsalo como base para tus propios proyectos
-👉 Dona
-
----
-
-## ☕ Buy Me a Coffee
-
-Si quieres apoyar el proyecto:
-
-## [![Buy Me a Coffee](https://img.shields.io/badge/Support-Buy%20Me%20a%20Coffee-orange?style=for-the-badge&logo=paypal)](https://paypal.me/arararcadabra?locale.x=es_XC&country.x=EC)
-
----
-
-## 🛡️ Avalon Labs
-
-> “Building the future of software”
+Este proyecto es educativo y de apoyo operativo. No sustituye un sandbox, un EDR ni una plataforma profesional de threat intel.
