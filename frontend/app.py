@@ -1,14 +1,23 @@
+import json
+import os
 import time
 
 import requests
 import streamlit as st
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - fallback para entornos minimos
+    def load_dotenv() -> bool:
+        return False
 
 st.set_page_config(page_title="CyberScan", page_icon="🛡️", layout="wide")
 
-BASE_URL = "http://127.0.0.1:8000"
-REQUEST_TIMEOUT = 30
-POLL_INTERVAL = 2
-MAX_POLLS = 15
+load_dotenv()
+
+BASE_URL = os.getenv("CYBERSCAN_API_URL", "http://127.0.0.1:8000")
+REQUEST_TIMEOUT = int(os.getenv("CYBERSCAN_REQUEST_TIMEOUT", "30"))
+POLL_INTERVAL = int(os.getenv("CYBERSCAN_POLL_INTERVAL", "2"))
+MAX_POLLS = int(os.getenv("CYBERSCAN_MAX_POLLS", "15"))
 THEMES = {
     "Claro": {
         "bg": "#f4f7fb",
@@ -313,6 +322,15 @@ def close_card():
     st.markdown("</section>", unsafe_allow_html=True)
 
 
+def load_dashboard_snapshot():
+    try:
+        summary = api_request("GET", "/scan/summary")
+        history = api_request("GET", "/scan/history", params={"limit": 8})
+        return summary, history.get("items", [])
+    except Exception:
+        return None, []
+
+
 def api_request(method: str, path: str, **kwargs):
     response = requests.request(
         method,
@@ -375,10 +393,31 @@ def show_friendly_result(risk: str):
     )
 
 
+def render_ioc_summary(result_data: dict):
+    resource_type = result_data.get("resource_type", "resultado")
+    indicator = result_data.get("indicator") or result_data.get("sha256") or "N/D"
+    reputation = result_data.get("reputation", "N/D")
+    source = result_data.get("source", "live")
+
+    st.markdown(
+        f"""
+        <div class="cyberscan-card">
+            <h3>IOC summary</h3>
+            <p class="cyberscan-muted"><strong>Tipo:</strong> {resource_type}</p>
+            <p class="cyberscan-muted"><strong>Indicador:</strong> {indicator}</p>
+            <p class="cyberscan-muted"><strong>Reputacion:</strong> {reputation}</p>
+            <p class="cyberscan-muted"><strong>Fuente:</strong> {source}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_result(result_data: dict):
     risk = result_data.get("risk", "UNKNOWN")
     stats = result_data.get("stats", {})
     show_friendly_result(risk)
+    render_ioc_summary(result_data)
 
     top_left, top_mid, top_right = st.columns(3)
     top_left.metric("Riesgo", risk)
@@ -397,6 +436,13 @@ def render_result(result_data: dict):
     if categories:
         st.write("Categorias detectadas:")
         st.json(categories)
+
+    st.download_button(
+        label="Descargar reporte JSON",
+        data=json.dumps(result_data, indent=2, ensure_ascii=False),
+        file_name=f"cyberscan-report-{result_data.get('resource_type', 'scan')}.json",
+        mime="application/json",
+    )
 
     with st.expander("Detalles tecnicos"):
         st.json(result_data)
@@ -439,6 +485,53 @@ st.sidebar.markdown(
 )
 
 render_hero()
+summary, recent_history = load_dashboard_snapshot()
+
+summary_col_1, summary_col_2, summary_col_3 = st.columns(3)
+summary_col_1.markdown(
+    f"""
+    <div class="cyberscan-card">
+        <h3>Escaneos recientes</h3>
+        <p class="cyberscan-muted">{(summary or {}).get('total_scans', 0)} consultas registradas</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+summary_col_2.markdown(
+    f"""
+    <div class="cyberscan-card">
+        <h3>TTL de cache</h3>
+        <p class="cyberscan-muted">{(summary or {}).get('cache_ttl_hours', 'N/D')} horas</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+summary_col_3.markdown(
+    f"""
+    <div class="cyberscan-card">
+        <h3>Endpoint activo</h3>
+        <p class="cyberscan-muted">{BASE_URL}</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+if summary:
+    trend_left, trend_right = st.columns([1.4, 1])
+    with trend_left:
+        st.markdown("### Resumen operativo")
+        st.json(
+            {
+                "by_risk": summary.get("by_risk", {}),
+                "by_type": summary.get("by_type", {}),
+            }
+        )
+    with trend_right:
+        st.markdown("### Historial reciente")
+        if recent_history:
+            st.dataframe(recent_history, use_container_width=True, hide_index=True)
+        else:
+            st.info("Aun no hay historial guardado.")
 
 privacy_accepted = st.checkbox(
     "Acepto que cualquier indicador enviado sera consultado externamente y no incluire informacion confidencial."

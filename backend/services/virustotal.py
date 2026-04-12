@@ -4,7 +4,11 @@ import time
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - fallback para entornos minimos
+    def load_dotenv() -> bool:
+        return False
 
 load_dotenv()
 

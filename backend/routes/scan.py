@@ -6,6 +6,15 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.services.analyzer import analyze_result, extract_stats
+from backend.services.storage import (
+    get_cached_result,
+    get_submission,
+    get_summary,
+    list_history,
+    record_history,
+    save_cached_result,
+    save_submission,
+)
 from backend.services.virustotal import (
     VirusTotalError,
     calculate_sha256,
@@ -116,6 +125,20 @@ def _resource_response(resource_type: str, indicator: str, vt_result: dict) -> d
     }
 
 
+def _cache_and_record(resource_type: str, indicator: str, response: dict, source: str) -> dict:
+    response_with_source = {**response, "source": source}
+    save_cached_result(resource_type, indicator, response_with_source)
+    record_history(
+        resource_type=resource_type,
+        indicator=indicator,
+        status=response_with_source.get("status", "completed"),
+        risk=response_with_source.get("risk"),
+        response=response_with_source,
+        source=source,
+    )
+    return response_with_source
+
+
 @router.post("/file")
 async def scan_file(file: UploadFile = File(...)):
     if not file.filename:
@@ -130,6 +153,18 @@ async def scan_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail=f"El archivo supera el limite de {MAX_FILE_SIZE // (1024 * 1024)} MB.")
 
     sha256_hash = calculate_sha256(content)
+    cached = get_cached_result("file", sha256_hash)
+    if cached:
+        cached_response = dict(cached)
+        cached_response.update(
+            {
+                "filename": file.filename,
+                "sha256": sha256_hash,
+                "source": "cache",
+            }
+        )
+        record_history("file", sha256_hash, cached_response.get("status", "completed"), cached_response, cached_response.get("risk"), "cache")
+        return cached_response
 
     try:
         vt_result = get_file_report(sha256_hash)
@@ -138,10 +173,9 @@ async def scan_file(file: UploadFile = File(...)):
             {
                 "filename": file.filename,
                 "sha256": sha256_hash,
-                "source": "existing_report",
             }
         )
-        return response
+        return _cache_and_record("file", sha256_hash, response, "live")
     except VirusTotalError as exc:
         if exc.status_code != 404:
             _handle_vt_error(exc)
@@ -152,7 +186,9 @@ async def scan_file(file: UploadFile = File(...)):
         _handle_vt_error(exc)
 
     analysis_id = upload_response.get("data", {}).get("id")
-    return {
+    if analysis_id:
+        save_submission(analysis_id, "file", sha256_hash)
+    response = {
         "resource_type": "file",
         "filename": file.filename,
         "sha256": sha256_hash,
@@ -160,11 +196,17 @@ async def scan_file(file: UploadFile = File(...)):
         "message": "Archivo enviado a VirusTotal para analisis.",
         "analysis_id": analysis_id,
     }
+    record_history("file", sha256_hash, "submitted", response, None, "live")
+    return response
 
 
 @router.post("/url")
 def scan_url_endpoint(request: URLRequest):
     safe_url = _validate_public_url(request.url)
+    cached = get_cached_result("url", safe_url)
+    if cached:
+        record_history("url", safe_url, cached.get("status", "completed"), cached, cached.get("risk"), "cache")
+        return cached
     try:
         result = submit_url(safe_url)
     except VirusTotalError as exc:
@@ -174,17 +216,24 @@ def scan_url_endpoint(request: URLRequest):
     if not analysis_id:
         raise HTTPException(status_code=502, detail="VirusTotal no devolvio un analysis_id para la URL.")
 
-    return {
+    response = {
         "resource_type": "url",
         "indicator": safe_url,
         "status": "submitted",
         "analysis_id": analysis_id,
     }
+    save_submission(analysis_id, "url", safe_url)
+    record_history("url", safe_url, "submitted", response, None, "live")
+    return response
 
 
 @router.post("/hash")
 def scan_hash_endpoint(request: HashRequest):
     normalized_hash = _validate_hash(request.hash)
+    cached = get_cached_result("hash", normalized_hash)
+    if cached:
+        record_history("hash", normalized_hash, cached.get("status", "completed"), cached, cached.get("risk"), "cache")
+        return cached
     try:
         result = get_file_report(normalized_hash)
     except VirusTotalError as exc:
@@ -192,27 +241,37 @@ def scan_hash_endpoint(request: HashRequest):
 
     response = _resource_response("hash", normalized_hash, result)
     response["sha256"] = result.get("data", {}).get("id", normalized_hash)
-    return response
+    return _cache_and_record("hash", normalized_hash, response, "live")
 
 
 @router.post("/domain")
 def scan_domain_endpoint(request: DomainRequest):
     domain = _validate_domain(request.domain)
+    cached = get_cached_result("domain", domain)
+    if cached:
+        record_history("domain", domain, cached.get("status", "completed"), cached, cached.get("risk"), "cache")
+        return cached
     try:
         result = get_domain_report(domain)
     except VirusTotalError as exc:
         _handle_vt_error(exc)
-    return _resource_response("domain", domain, result)
+    response = _resource_response("domain", domain, result)
+    return _cache_and_record("domain", domain, response, "live")
 
 
 @router.post("/ip")
 def scan_ip_endpoint(request: IPRequest):
     public_ip = _validate_public_ip(request.ip)
+    cached = get_cached_result("ip", public_ip)
+    if cached:
+        record_history("ip", public_ip, cached.get("status", "completed"), cached, cached.get("risk"), "cache")
+        return cached
     try:
         result = get_ip_report(public_ip)
     except VirusTotalError as exc:
         _handle_vt_error(exc)
-    return _resource_response("ip", public_ip, result)
+    response = _resource_response("ip", public_ip, result)
+    return _cache_and_record("ip", public_ip, response, "live")
 
 
 @router.get("/result/{analysis_id}")
@@ -232,9 +291,30 @@ def get_scan_result(analysis_id: str):
             "message": "Analysis in progress",
         }
 
-    return {
+    response = {
         "status": "completed",
         "risk": analyze_result({"data": {"attributes": {"stats": stats}}}),
         "stats": stats,
         "raw": result,
     }
+    submission = get_submission(analysis_id)
+    if submission:
+        response.update(
+            {
+                "resource_type": submission["resource_type"],
+                "indicator": submission["indicator"],
+            }
+        )
+        _cache_and_record(submission["resource_type"], submission["indicator"], response, "live")
+    return response
+
+
+@router.get("/history")
+def get_history(limit: int = 20):
+    safe_limit = max(1, min(limit, 100))
+    return {"items": list_history(limit=safe_limit)}
+
+
+@router.get("/summary")
+def scan_summary():
+    return get_summary()

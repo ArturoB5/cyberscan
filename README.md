@@ -17,6 +17,10 @@ Actualmente permite analizar:
 - Reutiliza reportes existentes cuando VirusTotal ya conoce el indicador
 - Envia archivos y URLs a analisis cuando todavia no existe un reporte
 - Bloquea entradas obvias no seguras para el flujo, como `localhost` o IPs no publicas
+- Guarda historial local en SQLite
+- Usa cache local por indicador para acelerar consultas repetidas
+- Expone un resumen operativo de tipos de IOC y niveles de riesgo
+- Permite descargar reportes en JSON desde la interfaz
 
 ## Arquitectura
 
@@ -60,6 +64,11 @@ Crea un archivo `.env` en la raiz del proyecto con:
 
 ```env
 VT_API_KEY=tu_api_key_aqui
+CYBERSCAN_API_URL=http://127.0.0.1:8000
+CYBERSCAN_DB_PATH=cyberscan.db
+CYBERSCAN_CACHE_TTL_HOURS=12
+CYBERSCAN_RATE_LIMIT_WINDOW=60
+CYBERSCAN_RATE_LIMIT_MAX=60
 ```
 
 No se recomienda hardcodear la clave en el codigo.
@@ -91,6 +100,8 @@ Servicios por defecto:
 - `POST /scan/domain`
 - `POST /scan/ip`
 - `GET /scan/result/{analysis_id}`
+- `GET /scan/history`
+- `GET /scan/summary`
 
 ## Ejemplo de respuesta
 
@@ -114,7 +125,17 @@ Servicios por defecto:
 - Los archivos se limitan a 32 MB para evitar abuso de memoria en este flujo
 - Solo se aceptan URLs con `http` o `https`
 - Se rechazan `localhost` e IPs no publicas en escaneo de URL e IP
+- El backend aplica rate limiting basico por IP
+- Se registran historial y cache en SQLite para evitar trabajo repetido
 - El analisis depende de la disponibilidad y cuota de VirusTotal
+
+## Tests basicos
+
+Puedes ejecutar la suite incluida con:
+
+```bash
+python -m unittest discover -s tests
+```
 
 ## Roadmap sugerido
 
@@ -128,6 +149,12 @@ Servicios por defecto:
 
 Arturo Badillo  
 Avalon Labs
+
+## Invitame un cafe
+
+Si quieres apoyar el proyecto:
+
+[![Invitame un cafe](https://img.shields.io/badge/Support-Buy%20Me%20a%20Coffee-orange?style=for-the-badge&logo=paypal)](https://paypal.me/arararcadabra?locale.x=es_XC&country.x=EC)
 
 ## Disclaimer
 
