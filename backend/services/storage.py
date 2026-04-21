@@ -5,6 +5,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from backend.utils.env import load_project_env
+
+load_project_env()
 
 DEFAULT_DB_PATH = Path(os.getenv("CYBERSCAN_DB_PATH", "cyberscan.db"))
 CACHE_TTL_HOURS = int(os.getenv("CYBERSCAN_CACHE_TTL_HOURS", "12"))

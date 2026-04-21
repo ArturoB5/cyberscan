@@ -8,6 +8,9 @@ from fastapi.responses import JSONResponse
 
 from backend.routes.scan import router as scan_router
 from backend.services.storage import init_db
+from backend.utils.env import load_project_env
+
+load_project_env()
 
 REQUEST_WINDOW_SECONDS = int(os.getenv("CYBERSCAN_RATE_LIMIT_WINDOW", "60"))
 REQUEST_LIMIT = int(os.getenv("CYBERSCAN_RATE_LIMIT_MAX", "60"))

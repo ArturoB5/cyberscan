@@ -1,18 +1,47 @@
 import json
 import os
 import time
+from pathlib import Path
 
 import requests
 import streamlit as st
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover - fallback para entornos minimos
-    def load_dotenv() -> bool:
-        return False
+    load_dotenv = None
 
 st.set_page_config(page_title="CyberScan", page_icon="🛡️", layout="wide")
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_local_env() -> bool:
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.exists():
+        return False
+
+    if load_dotenv is not None:
+        return load_dotenv(dotenv_path=env_path, override=False)
+
+    loaded = False
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if not key or key in os.environ:
+            continue
+
+        os.environ[key] = value
+        loaded = True
+
+    return loaded
+
+
+load_local_env()
 
 BASE_URL = os.getenv("CYBERSCAN_API_URL", "http://127.0.0.1:8000")
 REQUEST_TIMEOUT = int(os.getenv("CYBERSCAN_REQUEST_TIMEOUT", "30"))

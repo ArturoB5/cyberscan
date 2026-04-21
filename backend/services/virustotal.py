@@ -4,15 +4,11 @@ import time
 from typing import Any
 
 import requests
-try:
-    from dotenv import load_dotenv
-except ModuleNotFoundError:  # pragma: no cover - fallback para entornos minimos
-    def load_dotenv() -> bool:
-        return False
 
-load_dotenv()
+from backend.utils.env import load_project_env
 
-VT_API_KEY = os.getenv("VT_API_KEY")
+load_project_env()
+
 VT_BASE = "https://www.virustotal.com/api/v3"
 TIMEOUT = 30
 MAX_RETRIES = 3
@@ -28,12 +24,18 @@ class VirusTotalError(Exception):
         self.details = details
 
 
-def _ensure_api_key() -> None:
-    if not VT_API_KEY:
+def _get_api_key() -> str | None:
+    return os.getenv("VT_API_KEY")
+
+
+def _ensure_api_key() -> str:
+    api_key = _get_api_key()
+    if not api_key:
         raise VirusTotalError(
             "VT_API_KEY no esta configurada en el entorno.",
             status_code=500,
         )
+    return api_key
 
 
 def calculate_sha256(file_bytes: bytes) -> str:
@@ -41,8 +43,7 @@ def calculate_sha256(file_bytes: bytes) -> str:
 
 
 def _headers() -> dict[str, str]:
-    _ensure_api_key()
-    return {"x-apikey": VT_API_KEY}
+    return {"x-apikey": _ensure_api_key()}
 
 
 def _request_json(method: str, url: str, use_base: bool = True, **kwargs: Any) -> dict[str, Any]:
