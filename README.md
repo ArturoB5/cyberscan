@@ -154,7 +154,9 @@ Avalon Labs
 
 Si quieres apoyar el proyecto:
 
-[![Invitame un cafe](https://img.shields.io/badge/Support-Buy%20Me%20a%20Coffee-orange?style=for-the-badge&logo=paypal)](https://paypal.me/arararcadabra?locale.x=es_XC&country.x=EC)
+<a href="https://www.paypal.com/paypalme/arararcadabra?locale.x=es_XC&country.x=EC" target="_blank">
+  <img src="https://img.shields.io/badge/Invitame%20un%20cafe-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Invitame un cafe">
+</a>
 
 ## Disclaimer
 
