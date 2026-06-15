@@ -112,9 +112,12 @@ def apply_theme(theme_name: str):
             }}
 
             .block-container {{
-                max-width: 1180px;
+                width: min(96vw, 1520px);
+                max-width: none;
                 padding-top: 2rem;
                 padding-bottom: 2rem;
+                padding-left: 1.25rem;
+                padding-right: 1.25rem;
             }}
 
             [data-testid="stSidebar"] {{
@@ -128,6 +131,11 @@ def apply_theme(theme_name: str):
 
             div[data-testid="stVerticalBlock"] div:has(> div.cyberscan-card) {{
                 width: 100%;
+            }}
+
+            div[data-testid="stHorizontalBlock"] {{
+                gap: 1.2rem;
+                align-items: stretch;
             }}
 
             .cyberscan-hero {{
@@ -310,6 +318,14 @@ def apply_theme(theme_name: str):
 
             .stCaption, .stMarkdown p {{
                 color: var(--muted);
+            }}
+
+            @media (max-width: 1200px) {{
+                .block-container {{
+                    width: min(100vw, 1200px);
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                }}
             }}
         </style>
         """,
@@ -546,7 +562,7 @@ summary_col_3.markdown(
 )
 
 if summary:
-    trend_left, trend_right = st.columns([1.4, 1])
+    trend_left, trend_right = st.columns([0.9, 1.9], gap="large")
     with trend_left:
         st.markdown("### Resumen operativo")
         st.json(
@@ -575,7 +591,7 @@ option = st.radio(
     horizontal=True,
 )
 
-left, right = st.columns([1, 1])
+left, right = st.columns([1.05, 1.35], gap="large")
 
 with left:
     if option == "Archivo":
